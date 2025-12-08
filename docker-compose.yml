@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  broker:
+    image: apache/activemq-artemis:latest-alpine
+    ports:
+      - "61616:61616"
+      - "8161:8161"
+    environment:
+      - ANONYMOUS_LOGIN=true
+      - EXTRA_ARGS=--nio
+
+  example-app:
+    build: .
+    command: ["sh", "-c", "echo 'Waiting for broker...'; sleep 10; java -cp examples.jar:lib/* it.janczewski.examples.App"]
+    environment:
+      - BROKER_URL=tcp://broker:61616
+      - PROXY_ENABLED=${PROXY_ENABLED:-true}
+    depends_on:
+      - broker
+
+#  producer:
+#    build: .
+#    command: ["java", "-cp", "examples.jar:lib/*", "com.jmsproxy.examples.BenchmarkProducer"]
+#    environment:
+#      - BROKER_URL=tcp://broker:61616
+#      - PROXY_ENABLED=${PROXY_ENABLED:-true}
+#      - MSG_RATE=${MSG_RATE:-50}
+#      - DURATION_SEC=${DURATION_SEC:-60}
+#      - CONDENSER_WINDOW_MS=${CONDENSER_WINDOW_MS:-2000}
+#      - CONDENSER_BATCH_SIZE=${CONDENSER_BATCH_SIZE:-100}
+#    depends_on:
+#      - broker
+#
+#  consumer:
+#    build: .
+#    command: ["java", "-cp", "examples.jar:lib/*", "com.jmsproxy.examples.BenchmarkConsumer"]
+#    environment:
+#      - BROKER_URL=tcp://broker:61616
+#      - PROXY_ENABLED=${PROXY_ENABLED:-true}
+#    depends_on:
+#      - broker
+

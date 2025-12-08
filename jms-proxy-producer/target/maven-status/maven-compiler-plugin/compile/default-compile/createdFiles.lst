@@ -1,0 +1,4 @@
+com/jmsproxy/producer/ProxySessionWrapper.class
+com/jmsproxy/producer/ProxySessionWrapper$Builder.class
+com/jmsproxy/producer/ProxyMessageProducer$Builder.class
+com/jmsproxy/producer/ProxyMessageProducer.class

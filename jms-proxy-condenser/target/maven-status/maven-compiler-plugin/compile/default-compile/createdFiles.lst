@@ -1,0 +1,6 @@
+com/jmsproxy/condenser/JsonMessageExpander.class
+com/jmsproxy/condenser/JsonMessageCondenser.class
+com/jmsproxy/condenser/JsonMessageCondenser$Builder.class
+com/jmsproxy/condenser/JsonFieldExclusionStrategy$Builder.class
+com/jmsproxy/condenser/JsonFieldExclusionStrategy.class
+com/jmsproxy/condenser/JsonMessageCondenser$BufferedMessage.class
