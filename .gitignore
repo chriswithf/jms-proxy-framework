@@ -1,9 +1,10 @@
-/.DS_Store
-/.vscode
+.DS_Store
+.vscode/
 
 # Maven
 target/
 *.class
+*.jar
 
 # IntelliJ IDEA
 .idea/

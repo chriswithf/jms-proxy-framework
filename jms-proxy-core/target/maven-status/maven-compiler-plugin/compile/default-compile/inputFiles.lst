@@ -1,9 +1,0 @@
-/Users/Shared/jms-proxy-framework/jms-proxy-core/src/main/java/com/jmsproxy/core/util/MessageUtils.java
-/Users/Shared/jms-proxy-framework/jms-proxy-core/src/main/java/com/jmsproxy/core/MessageComparisonStrategy.java
-/Users/Shared/jms-proxy-framework/jms-proxy-core/src/main/java/com/jmsproxy/core/util/JsonUtils.java
-/Users/Shared/jms-proxy-framework/jms-proxy-core/src/main/java/com/jmsproxy/core/CondensedMessageEnvelope.java
-/Users/Shared/jms-proxy-framework/jms-proxy-core/src/main/java/com/jmsproxy/core/OriginalMessageInfo.java
-/Users/Shared/jms-proxy-framework/jms-proxy-core/src/main/java/com/jmsproxy/core/MessageCondenser.java
-/Users/Shared/jms-proxy-framework/jms-proxy-core/src/main/java/com/jmsproxy/core/ProxyConfiguration.java
-/Users/Shared/jms-proxy-framework/jms-proxy-core/src/main/java/com/jmsproxy/core/MessageExpander.java
-/Users/Shared/jms-proxy-framework/jms-proxy-core/src/main/java/com/jmsproxy/core/SendCriteria.java

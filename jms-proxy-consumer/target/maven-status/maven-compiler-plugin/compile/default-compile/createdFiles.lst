@@ -1,6 +1,0 @@
-com/jmsproxy/consumer/ProxyMessageListener.class
-com/jmsproxy/consumer/ProxyMessageConsumer$Builder.class
-com/jmsproxy/consumer/ProxyMessageListener$Builder.class
-com/jmsproxy/consumer/ProxyMessageConsumer.class
-com/jmsproxy/consumer/BufferedProxyMessageConsumer.class
-com/jmsproxy/consumer/BufferedProxyMessageConsumer$Builder.class
