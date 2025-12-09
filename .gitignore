@@ -1,2 +1,19 @@
 /.DS_Store
 /.vscode
+
+# Maven
+target/
+*.class
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Eclipse
+.settings/
+.classpath
+.project
+bin/
+
+# Logs
+*.log
