@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Random;
@@ -103,6 +104,7 @@ public class BenchmarkProducer {
             }
 
             AtomicLong sentCount = new AtomicLong(0);
+            AtomicLong totalBytesGenerated = new AtomicLong(0);
             ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
             
             long periodNs = 1_000_000_000L / MSG_RATE;
@@ -112,15 +114,27 @@ public class BenchmarkProducer {
             
             // State for simulating stable sensor readings
             final double[] currentValues = new double[] { 20.0, 50.0 }; // temp, humidity
+            final int[] deviceState = new int[] { 95, 4 }; // battery, signal
+            final String[] firmware = new String[] { "v1.2.3" };
+            final String[] payload = new String[] { "initial_payload_data" };
 
             MessageProducer finalProducer = producer;
             Runnable sendTask = () -> {
                 try {
+                    // Simulate sensor reading time (jitter)
+                    Thread.sleep(random.nextInt(5));
+
                     // Change values only every 10 messages to simulate stable sensor readings
                     // This allows the Condenser to aggregate identical readings
                     if (sentCount.get() % 10 == 0) {
                         currentValues[0] = 20.0 + random.nextGaussian();
                         currentValues[1] = 50.0 + random.nextGaussian();
+                        deviceState[0] = Math.max(0, deviceState[0] - (random.nextInt(2))); // drain battery slowly
+                        deviceState[1] = random.nextInt(5); // signal strength 0-4
+                        // Generate a random payload string of 50-100 chars
+                        byte[] randomBytes = new byte[50 + random.nextInt(50)];
+                        random.nextBytes(randomBytes);
+                        payload[0] = UUID.randomUUID().toString() + "-sensor-data-" + sentCount.get();
                     }
 
                     ObjectNode json = mapper.createObjectNode();
@@ -128,6 +142,10 @@ public class BenchmarkProducer {
                     json.put("timestamp", System.currentTimeMillis());
                     json.put("temperature", currentValues[0]);
                     json.put("humidity", currentValues[1]);
+                    json.put("battery", deviceState[0]);
+                    json.put("signal", deviceState[1]);
+                    json.put("firmware", firmware[0]);
+                    json.put("payload", payload[0]);
                     json.put("location", "Lab-1"); // Constant
                     
                     // Add content for FILTER_CONTENT
@@ -135,7 +153,10 @@ public class BenchmarkProducer {
                         json.put("type", "important");
                     }
 
-                    TextMessage message = session.createTextMessage(json.toString());
+                    String jsonString = json.toString();
+                    totalBytesGenerated.addAndGet(jsonString.getBytes(StandardCharsets.UTF_8).length);
+
+                    TextMessage message = session.createTextMessage(jsonString);
                     
                     // Add property for FILTER_PROPERTY
                     message.setStringProperty("priority", sentCount.get() % 2 == 0 ? "high" : "low");
@@ -173,6 +194,8 @@ public class BenchmarkProducer {
                     statsJson.put("inputMessages", stats.getOrDefault("inputMessages", 0L));
                     statsJson.put("outputBatches", stats.getOrDefault("outputBatches", 0L));
                     statsJson.put("totalSent", sentCount.get());
+                    statsJson.put("totalBytesGenerated", totalBytesGenerated.get());
+                    statsJson.put("avgMessageSize", sentCount.get() > 0 ? totalBytesGenerated.get() / sentCount.get() : 0);
                     
                     String filename = String.format("results/producer_stats_%d.json", System.currentTimeMillis());
                     try (FileWriter writer = new FileWriter(filename)) {
