@@ -2,6 +2,7 @@ package com.jmsproxy.core;
 
 import jakarta.jms.Message;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Interface for message condensers that aggregate multiple similar messages.
@@ -49,4 +50,12 @@ public interface MessageCondenser {
      * Clears all buffered messages without sending.
      */
     void clear();
+
+    /**
+     * Returns statistics about the condensation process.
+     * @return Map of metric names to values
+     */
+    default Map<String, Long> getStats() {
+        return java.util.Collections.emptyMap();
+    }
 }

@@ -6,7 +6,7 @@
         </encoder>
     </appender>
 
-    <logger name="com.jmsproxy" level="DEBUG"/>
+    <logger name="com.jmsproxy" level="INFO"/>
     <logger name="org.apache.activemq" level="WARN"/>
 
     <root level="INFO">

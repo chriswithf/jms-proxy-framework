@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 /**
@@ -109,6 +110,13 @@ public class ProxyMessageProducer implements MessageProducer {
         return builder(producer, session)
             .configuration(ProxyConfiguration.passThrough())
             .build();
+    }
+
+    public Map<String, Long> getCondenserStats() {
+        if (condenser != null) {
+            return condenser.getStats();
+        }
+        return java.util.Collections.emptyMap();
     }
     
     @Override

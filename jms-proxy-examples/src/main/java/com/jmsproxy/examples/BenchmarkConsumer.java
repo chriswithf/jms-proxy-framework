@@ -2,12 +2,17 @@ package com.jmsproxy.examples;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.jmsproxy.consumer.BufferedProxyMessageConsumer;
 import jakarta.jms.*;
 import org.apache.activemq.artemis.jms.client.ActiveMQConnectionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAccumulator;
 
@@ -104,6 +109,8 @@ public class BenchmarkConsumer {
         long duration = System.currentTimeMillis() - startTime;
         double rate = (count * 1000.0) / duration;
         double avgLatency = count > 0 ? totalLatency.get() / (double) count : 0;
+        long minLat = minLatency.get() == Long.MAX_VALUE ? 0 : minLatency.get();
+        long maxLat = maxLatency.get();
 
         System.out.println("\n\n================================================================");
         System.out.println("BENCHMARK REPORT (" + (PROXY_ENABLED ? "PROXY" : "BASELINE") + ")");
@@ -113,8 +120,36 @@ public class BenchmarkConsumer {
         System.out.printf("Throughput:              %.2f msg/s%n", rate);
         System.out.println("----------------------------------------------------------------");
         System.out.printf("Avg Latency:             %.2f ms%n", avgLatency);
-        System.out.printf("Min Latency:             %d ms%n", minLatency.get() == Long.MAX_VALUE ? 0 : minLatency.get());
-        System.out.printf("Max Latency:             %d ms%n", maxLatency.get());
+        System.out.printf("Min Latency:             %d ms%n", minLat);
+        System.out.printf("Max Latency:             %d ms%n", maxLat);
         System.out.println("================================================================\n");
+
+        // Write to JSON file
+        try {
+            File resultsDir = new File("results");
+            if (!resultsDir.exists()) {
+                resultsDir.mkdirs();
+            }
+            
+            ObjectNode resultJson = mapper.createObjectNode();
+            resultJson.put("timestamp", Instant.now().toString());
+            resultJson.put("proxyEnabled", PROXY_ENABLED);
+            resultJson.put("totalMessages", count);
+            resultJson.put("durationSec", duration / 1000.0);
+            resultJson.put("throughput", rate);
+            resultJson.put("avgLatency", avgLatency);
+            resultJson.put("minLatency", minLat);
+            resultJson.put("maxLatency", maxLat);
+            
+            String filename = String.format("results/result_%s_%d.json", 
+                PROXY_ENABLED ? "proxy" : "baseline", System.currentTimeMillis());
+            
+            try (FileWriter writer = new FileWriter(filename)) {
+                writer.write(resultJson.toPrettyString());
+            }
+            System.out.println("Results written to " + filename);
+        } catch (IOException e) {
+            System.err.println("Failed to write results to file: " + e.getMessage());
+        }
     }
 }

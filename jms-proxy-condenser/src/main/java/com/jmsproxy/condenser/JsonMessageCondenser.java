@@ -32,6 +32,10 @@ public class JsonMessageCondenser implements MessageCondenser {
     private final Set<String> timestampFields;
     private final ObjectMapper objectMapper;
     
+    // Stats
+    private final java.util.concurrent.atomic.AtomicLong inputCount = new java.util.concurrent.atomic.AtomicLong(0);
+    private final java.util.concurrent.atomic.AtomicLong outputBatches = new java.util.concurrent.atomic.AtomicLong(0);
+    
     private JsonMessageCondenser(Builder builder) {
         this.comparisonStrategy = builder.comparisonStrategy;
         this.windowMs = builder.windowMs;
@@ -47,6 +51,7 @@ public class JsonMessageCondenser implements MessageCondenser {
     
     @Override
     public boolean shouldCondense(Message message) {
+        inputCount.incrementAndGet();
         String content = MessageUtils.getTextContent(message);
         return content != null && JsonUtils.isValidJson(content);
     }
@@ -96,6 +101,7 @@ public class JsonMessageCondenser implements MessageCondenser {
                     iterator.remove();
                     
                     logger.debug("Flushed {} messages into condensed envelope", envelope.getMessageCount());
+                    outputBatches.incrementAndGet();
                 }
             }
         }
@@ -198,6 +204,14 @@ public class JsonMessageCondenser implements MessageCondenser {
     
     private record BufferedMessage(Message message, String content, long bufferedAt) {}
     
+    @Override
+    public Map<String, Long> getStats() {
+        Map<String, Long> stats = new HashMap<>();
+        stats.put("inputMessages", inputCount.get());
+        stats.put("outputBatches", outputBatches.get());
+        return stats;
+    }
+
     public static class Builder {
         private MessageComparisonStrategy comparisonStrategy = JsonFieldExclusionStrategy.excludeTimestamps();
         private long windowMs = 1000;

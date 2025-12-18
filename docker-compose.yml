@@ -27,8 +27,11 @@ services:
       - PROXY_ENABLED=${PROXY_ENABLED:-true}
       - MSG_RATE=${MSG_RATE:-50}
       - DURATION_SEC=${DURATION_SEC:-60}
+      - CRITERIA_TYPE=${CRITERIA_TYPE:-CONDENSER}
       - CONDENSER_WINDOW_MS=${CONDENSER_WINDOW_MS:-2000}
       - CONDENSER_BATCH_SIZE=${CONDENSER_BATCH_SIZE:-100}
+    volumes:
+      - ./results:/app/results
     depends_on:
       - broker
 
@@ -38,6 +41,8 @@ services:
     environment:
       - BROKER_URL=tcp://broker:61616
       - PROXY_ENABLED=${PROXY_ENABLED:-true}
+    volumes:
+      - ./results:/app/results
     depends_on:
       - broker
 

@@ -1,6 +1,8 @@
 .DS_Store
 .vscode/
 
+energy-results/
+
 # Maven
 target/
 *.class
