@@ -1,6 +1,3 @@
 #!/bin/bash
-echo "Building project..."
-mvn clean package -DskipTests
-
-echo "Building Docker images..."
+echo "Building project and Docker images..."
 docker-compose build
