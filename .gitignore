@@ -2,6 +2,7 @@
 .vscode/
 
 energy-results/
+jms-proxy-test-20seconds
 
 # Maven
 target/
