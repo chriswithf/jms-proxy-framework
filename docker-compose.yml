@@ -10,14 +10,14 @@ services:
       - ANONYMOUS_LOGIN=true
       - EXTRA_ARGS=--nio
 
-  example-app:
-    build: .
-    command: ["sh", "-c", "echo 'Waiting for broker...'; sleep 10; java -cp examples.jar:lib/* it.janczewski.examples.App"]
-    environment:
-      - BROKER_URL=tcp://broker:61616
-      - PROXY_ENABLED=${PROXY_ENABLED:-true}
-    depends_on:
-      - broker
+  # example-app:
+  #   build: .
+  #   command: ["sh", "-c", "echo 'Waiting for broker...'; sleep 10; java -cp examples.jar:lib/* it.janczewski.examples.App"]
+  #   environment:
+  #     - BROKER_URL=tcp://broker:61616
+  #     - PROXY_ENABLED=${PROXY_ENABLED:-true}
+  #   depends_on:
+  #     - broker
 
   producer:
     build: .
