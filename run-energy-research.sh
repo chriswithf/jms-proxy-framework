@@ -11,8 +11,8 @@ echo "Starting Energy Research (Duration: ${DURATION_SEC}s per test)"
 echo "Results will be saved to: $RESULTS_DIR"
 
 # Build the project first
-echo "Building project..."
-mvn clean package -DskipTests
+echo "Building project (using Docker)..."
+# mvn clean package -DskipTests  <-- Removed host-side build
 docker-compose build
 
 # Function to run a single test scenario
