@@ -13,7 +13,7 @@ echo "Results will be saved to: $RESULTS_DIR"
 # Build the project first
 echo "Building project (using Docker)..."
 # mvn clean package -DskipTests  <-- Removed host-side build
-docker-compose build
+docker compose build
 
 # Function to run a single test scenario
 run_scenario() {
@@ -37,12 +37,12 @@ run_scenario() {
     export MSG_RATE=50 # Keep rate constant
 
     # Start containers
-    docker-compose up -d --force-recreate
+    docker compose up -d --force-recreate
 
     echo "Test running for $DURATION_SEC seconds..."
     
     # Wait for producer to finish (it exits after DURATION_SEC)
-    PRODUCER_ID=$(docker-compose ps -q producer)
+    PRODUCER_ID=$(docker compose ps -q producer)
     docker wait $PRODUCER_ID > /dev/null
 
     echo "Producer finished. Stopping consumer..."
@@ -51,22 +51,19 @@ run_scenario() {
     echo "Capturing Network Stats..."
     docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}" > "$RESULTS_DIR/${scenario_name}_net_stats.txt"
 
-    docker-compose stop consumer
+    docker compose stop consumer
     echo "Waiting for consumer to shutdown..."
     sleep 5
     
     echo "Stopping Scenario: $scenario_name"
     
-    # Capture logs
-    docker-compose logs consumer > "$RESULTS_DIR/${scenario_name}_consumer.log"
-    docker-compose logs producer > "$RESULTS_DIR/${scenario_name}_producer.log"
     
     # Move results
     mv results/result_*.json "$RESULTS_DIR/${scenario_name}_metrics.json" 2>/dev/null
     mv results/producer_stats_*.json "$RESULTS_DIR/${scenario_name}_producer_stats.json" 2>/dev/null
 
     # Cleanup
-    docker-compose down
+    docker compose down
     
     echo "Scenario $scenario_name completed."
     sleep 10 # Cool down

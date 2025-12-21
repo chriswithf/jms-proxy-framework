@@ -2,7 +2,6 @@ package com.jmsproxy.producer;
 
 import com.jmsproxy.condenser.JsonMessageCondenser;
 import com.jmsproxy.core.*;
-import com.jmsproxy.core.util.MessageUtils;
 import jakarta.jms.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +34,9 @@ public class ProxyMessageProducer implements MessageProducer {
     private boolean disableMessageID = false;
     private boolean disableMessageTimestamp = false;
     
+    // Adaptive flush scheduling - avoid polling when idle
+    private volatile boolean flushScheduled = false;
+    
     private ProxyMessageProducer(Builder builder) {
         this.delegate = builder.delegate;
         this.session = builder.session;
@@ -43,19 +45,14 @@ public class ProxyMessageProducer implements MessageProducer {
         this.criteria = new ArrayList<>(builder.criteria);
         
         // Start background flush if condenser is enabled
+        // Use adaptive scheduling instead of fixed rate polling
         if (config.isCondenserEnabled() && condenser != null) {
             this.flushExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
                 Thread t = new Thread(r, "JMSProxy-FlushExecutor");
                 t.setDaemon(true);
                 return t;
             });
-            
-            flushExecutor.scheduleAtFixedRate(
-                this::flushCondenser,
-                config.getFlushIntervalMs(),
-                config.getFlushIntervalMs(),
-                TimeUnit.MILLISECONDS
-            );
+            // Don't start polling immediately - will be triggered on first message
         } else {
             this.flushExecutor = null;
         }
@@ -138,34 +135,56 @@ public class ProxyMessageProducer implements MessageProducer {
     public void send(Destination destination, Message message, int deliveryMode, int priority, long timeToLive) 
             throws JMSException {
         
-        synchronized (lock) {
-            // Check criteria
-            if (config.isCriteriaEnabled() && !evaluateCriteria(message)) {
-                logger.debug("Message blocked by criteria");
-                return;
-            }
-            
-            // Check if condensing applies
-            if (config.isCondenserEnabled() && condenser != null && condenser.shouldCondense(message)) {
+        // Fast path: Check criteria first (lock-free for simple property checks)
+        if (config.isCriteriaEnabled() && !evaluateCriteria(message)) {
+            logger.debug("Message blocked by criteria");
+            return;
+        }
+        
+        // Check if condensing applies
+        if (config.isCondenserEnabled() && condenser != null && condenser.shouldCondense(message)) {
+            // Only synchronize for condenser operations
+            synchronized (lock) {
                 condenser.addMessage(message);
+                scheduleFlushIfNeeded();
+            }
+            // Guard debug logging - avoid string formatting when not needed
+            if (logger.isDebugEnabled()) {
                 logger.debug("Message added to condenser buffer");
-                return;
             }
-            
-            // Send directly
-            // Check if we should use the default destination to avoid UnsupportedOperationException
-            Destination defaultDest = null;
-            try {
-                defaultDest = delegate.getDestination();
-            } catch (JMSException e) {
-                // Ignore if we can't get destination
-            }
+            return;
+        }
+        
+        // Send directly - no lock needed for direct sends
+        // Check if we should use the default destination to avoid UnsupportedOperationException
+        Destination defaultDest = null;
+        try {
+            defaultDest = delegate.getDestination();
+        } catch (JMSException e) {
+            // Ignore if we can't get destination
+        }
 
-            if (defaultDest != null && (destination == null || destination.equals(defaultDest))) {
-                 delegate.send(message, deliveryMode, priority, timeToLive);
-            } else {
-                 delegate.send(destination, message, deliveryMode, priority, timeToLive);
-            }
+        if (defaultDest != null && (destination == null || destination.equals(defaultDest))) {
+             delegate.send(message, deliveryMode, priority, timeToLive);
+        } else {
+             delegate.send(destination, message, deliveryMode, priority, timeToLive);
+        }
+    }
+    
+    /**
+     * Schedule a flush if not already scheduled - adaptive scheduling saves CPU when idle.
+     */
+    private void scheduleFlushIfNeeded() {
+        if (!flushScheduled && flushExecutor != null) {
+            flushScheduled = true;
+            flushExecutor.schedule(() -> {
+                flushCondenser();
+                flushScheduled = false;
+                // Re-schedule if there are still messages
+                if (condenser != null && condenser.hasMessagesToFlush()) {
+                    scheduleFlushIfNeeded();
+                }
+            }, config.getFlushIntervalMs(), TimeUnit.MILLISECONDS);
         }
     }
     
@@ -190,23 +209,24 @@ public class ProxyMessageProducer implements MessageProducer {
     public void send(Destination destination, Message message, int deliveryMode, int priority, 
                      long timeToLive, CompletionListener completionListener) throws JMSException {
         
-        synchronized (lock) {
-            // Check criteria
-            if (config.isCriteriaEnabled() && !evaluateCriteria(message)) {
-                logger.debug("Message blocked by criteria");
-                completionListener.onCompletion(message);
-                return;
-            }
-            
-            // Check if condensing applies
-            if (config.isCondenserEnabled() && condenser != null && condenser.shouldCondense(message)) {
-                condenser.addMessage(message);
-                completionListener.onCompletion(message);
-                return;
-            }
-            
-            delegate.send(destination, message, deliveryMode, priority, timeToLive, completionListener);
+        // Fast path: Check criteria first (lock-free)
+        if (config.isCriteriaEnabled() && !evaluateCriteria(message)) {
+            logger.debug("Message blocked by criteria");
+            completionListener.onCompletion(message);
+            return;
         }
+        
+        // Check if condensing applies
+        if (config.isCondenserEnabled() && condenser != null && condenser.shouldCondense(message)) {
+            synchronized (lock) {
+                condenser.addMessage(message);
+                scheduleFlushIfNeeded();
+            }
+            completionListener.onCompletion(message);
+            return;
+        }
+        
+        delegate.send(destination, message, deliveryMode, priority, timeToLive, completionListener);
     }
     
     private boolean evaluateCriteria(Message message) {
@@ -219,15 +239,26 @@ public class ProxyMessageProducer implements MessageProducer {
     }
     
     private void flushCondenser() {
+        List<CondensedMessageEnvelope> envelopes = null;
+        
         synchronized (lock) {
             if (condenser == null || !condenser.hasMessagesToFlush()) {
                 return;
             }
             
             try {
-                List<CondensedMessageEnvelope> envelopes = condenser.flush();
-                
-                for (CondensedMessageEnvelope envelope : envelopes) {
+                // Flush returns lazy envelopes - fast operation inside lock
+                envelopes = condenser.flush();
+            } catch (Exception e) {
+                logger.error("Failed to flush condenser buffer", e);
+            }
+        }
+        
+        // Process envelopes OUTSIDE the lock to avoid blocking send() threads
+        // The heavy JSON serialization happens here when getAggregatedContent() is called
+        if (envelopes != null) {
+            for (CondensedMessageEnvelope envelope : envelopes) {
+                try {
                     TextMessage condensedMessage = session.createTextMessage(envelope.getAggregatedContent());
                     
                     // Set condensed marker properties
@@ -237,10 +268,13 @@ public class ProxyMessageProducer implements MessageProducer {
                     
                     delegate.send(condensedMessage, deliveryMode, priority, timeToLive);
                     
-                    logger.info("Sent condensed message containing {} original messages", envelope.getMessageCount());
+                    // Reduce log level to debug - info logging in hot path wastes CPU
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("Sent condensed message containing {} original messages", envelope.getMessageCount());
+                    }
+                } catch (JMSException e) {
+                    logger.error("Failed to send condensed message", e);
                 }
-            } catch (JMSException e) {
-                logger.error("Failed to flush condenser", e);
             }
         }
     }
@@ -249,15 +283,19 @@ public class ProxyMessageProducer implements MessageProducer {
      * Forces immediate flush of all buffered messages.
      */
     public void flush() throws JMSException {
+        List<CondensedMessageEnvelope> envelopes = null;
         synchronized (lock) {
             if (condenser != null) {
-                List<CondensedMessageEnvelope> envelopes = condenser.flush();
-                for (CondensedMessageEnvelope envelope : envelopes) {
-                    TextMessage condensedMessage = session.createTextMessage(envelope.getAggregatedContent());
-                    condensedMessage.setBooleanProperty(CondensedMessageEnvelope.CONDENSED_MARKER, true);
-                    condensedMessage.setIntProperty(CondensedMessageEnvelope.CONDENSED_COUNT, envelope.getMessageCount());
-                    delegate.send(condensedMessage);
-                }
+                envelopes = condenser.flush();
+            }
+        }
+        
+        if (envelopes != null) {
+            for (CondensedMessageEnvelope envelope : envelopes) {
+                TextMessage condensedMessage = session.createTextMessage(envelope.getAggregatedContent());
+                condensedMessage.setBooleanProperty(CondensedMessageEnvelope.CONDENSED_MARKER, true);
+                condensedMessage.setIntProperty(CondensedMessageEnvelope.CONDENSED_COUNT, envelope.getMessageCount());
+                delegate.send(condensedMessage);
             }
         }
     }

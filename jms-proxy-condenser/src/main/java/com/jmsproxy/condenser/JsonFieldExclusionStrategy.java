@@ -4,14 +4,26 @@ import com.jmsproxy.core.MessageComparisonStrategy;
 import com.jmsproxy.core.util.JsonUtils;
 
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 /**
  * JSON-based comparison strategy that ignores specified fields (like timestamps).
+ * Includes an LRU cache to avoid redundant parsing of identical content.
  */
 public class JsonFieldExclusionStrategy implements MessageComparisonStrategy {
     
     private final Set<String> excludeFields;
+    
+    // LRU cache for comparison keys - avoids re-parsing identical JSON
+    private static final int CACHE_SIZE = 1000;
+    private final Map<Integer, String> keyCache = new LinkedHashMap<>(CACHE_SIZE, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Integer, String> eldest) {
+            return size() > CACHE_SIZE;
+        }
+    };
     
     public JsonFieldExclusionStrategy(Set<String> excludeFields) {
         this.excludeFields = new HashSet<>(excludeFields);
@@ -45,10 +57,29 @@ public class JsonFieldExclusionStrategy implements MessageComparisonStrategy {
     
     @Override
     public String computeComparisonKey(String content) {
-        if (!JsonUtils.isValidJson(content)) {
+        // Fast path: check cache first using content hash
+        int contentHash = content.hashCode();
+        String cached;
+        synchronized (keyCache) {
+            cached = keyCache.get(contentHash);
+        }
+        if (cached != null) {
+            return cached;
+        }
+        
+        // Slow path: parse and normalize
+        if (!JsonUtils.looksLikeJson(content)) {
             return content;
         }
-        return JsonUtils.normalizeExcludingFields(content, excludeFields);
+        
+        String key = JsonUtils.normalizeExcludingFields(content, excludeFields);
+        
+        // Cache the result
+        synchronized (keyCache) {
+            keyCache.put(contentHash, key);
+        }
+        
+        return key;
     }
     
     public static class Builder {

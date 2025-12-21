@@ -111,13 +111,35 @@ public final class JsonUtils {
     }
     
     /**
+     * Quick check if a string looks like JSON without full parsing.
+     * This is a fast heuristic that catches most non-JSON strings.
+     * 
+     * @param content The string to check
+     * @return true if the string appears to be JSON
+     */
+    public static boolean looksLikeJson(String content) {
+        if (content == null) {
+            return false;
+        }
+        String trimmed = content.trim();
+        if (trimmed.isEmpty()) {
+            return false;
+        }
+        char first = trimmed.charAt(0);
+        char last = trimmed.charAt(trimmed.length() - 1);
+        return (first == '{' && last == '}') || (first == '[' && last == ']');
+    }
+    
+    /**
      * Checks if a string is valid JSON.
+     * Use {@link #looksLikeJson(String)} for faster checks when full validation isn't needed.
      * 
      * @param content The string to check
      * @return true if the string is valid JSON
      */
     public static boolean isValidJson(String content) {
-        if (content == null || content.trim().isEmpty()) {
+        // Fast path: quick structural check
+        if (!looksLikeJson(content)) {
             return false;
         }
         try {

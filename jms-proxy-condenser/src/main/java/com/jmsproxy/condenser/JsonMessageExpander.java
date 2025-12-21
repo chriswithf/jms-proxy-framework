@@ -44,7 +44,17 @@ public class JsonMessageExpander implements MessageExpander {
     @Override
     public boolean isCondensed(Message message) {
         String content = MessageUtils.getTextContent(message);
-        if (content == null || !JsonUtils.isValidJson(content)) {
+        if (content == null) {
+            return false;
+        }
+        
+        // Fast path: quick string check before full JSON parsing
+        // Look for the marker without full parsing
+        if (!content.contains("_condensedMeta")) {
+            return false;
+        }
+        
+        if (!JsonUtils.looksLikeJson(content)) {
             return false;
         }
         
@@ -103,7 +113,9 @@ public class JsonMessageExpander implements MessageExpander {
                 expandedMessages.add(expandedMessage);
             }
             
-            logger.debug("Expanded condensed message into {} individual messages", expandedMessages.size());
+            if (logger.isDebugEnabled()) {
+                logger.debug("Expanded condensed message into {} individual messages", expandedMessages.size());
+            }
             return expandedMessages;
             
         } catch (JsonProcessingException | JMSException e) {

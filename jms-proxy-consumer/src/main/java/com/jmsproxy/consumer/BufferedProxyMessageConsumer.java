@@ -118,7 +118,9 @@ public class BufferedProxyMessageConsumer implements MessageConsumer {
         if (expander.isCondensed(message)) {
             List<Message> expanded = expander.expand(message);
             if (!expanded.isEmpty()) {
-                logger.debug("Expanded condensed message into {} individual messages", expanded.size());
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Expanded condensed message into {} individual messages", expanded.size());
+                }
                 
                 // Return first, queue the rest
                 Message first = expanded.get(0);
@@ -148,8 +150,10 @@ public class BufferedProxyMessageConsumer implements MessageConsumer {
             try {
                 if (expander.isCondensed(message)) {
                     List<Message> expanded = expander.expand(message);
-                    logger.debug("Expanding condensed message to {} individual messages for listener", 
-                        expanded.size());
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("Expanding condensed message to {} individual messages for listener", 
+                            expanded.size());
+                    }
                     
                     for (Message expandedMessage : expanded) {
                         listener.onMessage(expandedMessage);

@@ -3,6 +3,8 @@
 
 energy-results/
 jms-proxy-test-20seconds
+jms-proxy-test-600seconds
+
 
 # Maven
 target/

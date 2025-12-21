@@ -19,6 +19,7 @@ public class CondensedMessageEnvelope implements Serializable {
     public static final String CONDENSED_MESSAGE_IDS = "_JMS_PROXY_CONDENSED_MESSAGE_IDS_";
     
     private final String aggregatedContent;
+    private final java.util.function.Supplier<String> contentSupplier;
     private final List<OriginalMessageInfo> originalMessages;
     private final long firstTimestamp;
     private final long lastTimestamp;
@@ -27,6 +28,29 @@ public class CondensedMessageEnvelope implements Serializable {
     public CondensedMessageEnvelope(String aggregatedContent, 
                                      List<OriginalMessageInfo> originalMessages) {
         this.aggregatedContent = aggregatedContent;
+        this.contentSupplier = null;
+        this.originalMessages = new ArrayList<>(originalMessages);
+        this.messageCount = originalMessages.size();
+        
+        if (!originalMessages.isEmpty()) {
+            this.firstTimestamp = originalMessages.stream()
+                .mapToLong(OriginalMessageInfo::getTimestamp)
+                .min()
+                .orElse(System.currentTimeMillis());
+            this.lastTimestamp = originalMessages.stream()
+                .mapToLong(OriginalMessageInfo::getTimestamp)
+                .max()
+                .orElse(System.currentTimeMillis());
+        } else {
+            this.firstTimestamp = System.currentTimeMillis();
+            this.lastTimestamp = System.currentTimeMillis();
+        }
+    }
+
+    public CondensedMessageEnvelope(java.util.function.Supplier<String> contentSupplier, 
+                                     List<OriginalMessageInfo> originalMessages) {
+        this.aggregatedContent = null;
+        this.contentSupplier = contentSupplier;
         this.originalMessages = new ArrayList<>(originalMessages);
         this.messageCount = originalMessages.size();
         
@@ -46,7 +70,13 @@ public class CondensedMessageEnvelope implements Serializable {
     }
     
     public String getAggregatedContent() {
-        return aggregatedContent;
+        if (aggregatedContent != null) {
+            return aggregatedContent;
+        }
+        if (contentSupplier != null) {
+            return contentSupplier.get();
+        }
+        return null;
     }
     
     public List<OriginalMessageInfo> getOriginalMessages() {
