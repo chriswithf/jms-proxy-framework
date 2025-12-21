@@ -12,7 +12,6 @@ echo "Results will be saved to: $RESULTS_DIR"
 
 # Build the project first
 echo "Building project (using Docker)..."
-# mvn clean package -DskipTests  <-- Removed host-side build
 docker compose build
 
 # Function to run a single test scenario
@@ -47,13 +46,8 @@ run_scenario() {
 
     echo "Producer finished. Stopping consumer..."
     
-    # Capture Network Stats
-    echo "Capturing Network Stats..."
-    docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}" > "$RESULTS_DIR/${scenario_name}_net_stats.txt"
-
     docker compose stop consumer
     echo "Waiting for consumer to shutdown..."
-    sleep 5
     
     echo "Stopping Scenario: $scenario_name"
     
