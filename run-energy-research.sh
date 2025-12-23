@@ -35,6 +35,10 @@ run_scenario() {
     export CONDENSER_BATCH_SIZE=$batch_size
     export MSG_RATE=50 # Keep rate constant
 
+    # Reset energy monitor
+    echo "Resetting energy monitor..."
+    curl -s -X GET http://localhost:7333/reset || echo "Warning: Failed to reset energy monitor"
+
     # Start containers
     docker compose up -d --force-recreate
 
